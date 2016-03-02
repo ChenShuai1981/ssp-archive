@@ -75,8 +75,8 @@ usage:
 -n, --build-number    required    docker image build number, eg: latest, 123
 -c, --conf-dir        optional    conf dir
 -g, --logs-dir        required    logs dir
--a, --akka-port       required    akka port, eg: 2661
--p, --http-port       required    http port, eg: 12661
+-a, --akka-port       required    akka port, eg: 7661
+-p, --http-port       required    http port, eg: 17661
 -j, --jvm             optional    JVM OPTS, eg: \"-Xmx8192m -Dfile.encoding=UTF-8\"
 -o, --options         optional    other application options, eg: \"--name ssp-reporting-service -h 10.0.1.2\", run \"sbt 'run --help'\" to get details
 -e, --environment     required    environment, eg: dev, qa

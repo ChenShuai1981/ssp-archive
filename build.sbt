@@ -5,14 +5,13 @@ import sbtassembly.AssemblyPlugin.autoImport._
 
 organization := "com.vpon"
 
-name := "ssp-kafka-s3"
+name := "ssp-archive"
 
 version := "0.1-SNAPSHOT"
 
 scalaVersion := "2.11.7"
 
 libraryDependencies ++= Seq(
-  "com.vpon"                  %% "vpon-mapping"               % "0.1-SNAPSHOT",
   "org.apache.httpcomponents" %  "httpcore-nio"               % "4.2",
   "org.apache.httpcomponents" %  "httpcore"                   % "4.2",
   "com.typesafe"              %  "config"                     % "1.2.1",

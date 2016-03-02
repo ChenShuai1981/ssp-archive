@@ -8,6 +8,6 @@ WORKDIR /
 
 VOLUME ["/conf", "/logs"]
 
-ADD *-assembly-*.jar /app/ssp-dedup-assembly.jar
+ADD *-assembly-*.jar /app/ssp-archive-assembly.jar
 
-ENTRYPOINT ["java", "-server", "-Xmx2G", "-XX:MaxPermSize=100m", "-XX:+UseConcMarkSweepGC", "-XX:+DisableExplicitGC", "-Dlogback.configurationFile=/conf/logback.xml", "-DPORT=2661", "-cp", "/app/ssp-dedup-assembly.jar", "com.vpon.ssp.report.dedup.Main", "-h", "12661", "-c", "/conf/application.conf"]
+ENTRYPOINT ["java", "-server", "-Xmx2G", "-XX:MaxPermSize=100m", "-XX:+UseConcMarkSweepGC", "-XX:+DisableExplicitGC", "-Dlogback.configurationFile=/conf/logback.xml", "-DPORT=7661", "-cp", "/app/ssp-dedup-assembly.jar", "com.vpon.ssp.report.archive.Main", "-h", "17661", "-c", "/conf/application.conf"]

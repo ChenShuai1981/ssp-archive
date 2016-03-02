@@ -7,10 +7,10 @@
         </encoder>
     </appender>
     <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOGFILE:-{{ INSIDE_LOG_DIR }}/ssp-kafka-s3.log }</file>
+        <file>${LOGFILE:-{{ INSIDE_LOG_DIR }}/ssp-archive.log }</file>
         <!-- <file>${LOGFILE:-/opt/apps/logs/ssp-dedup.log}</file> -->
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>{{ INSIDE_LOG_DIR }}/ssp-kafka-s3.%d{yyyy-MM-dd-HH}.log</fileNamePattern>
+            <fileNamePattern>{{ INSIDE_LOG_DIR }}/ssp-archive.%d{yyyy-MM-dd-HH}.log</fileNamePattern>
             <maxHistory>170</maxHistory>
         </rollingPolicy>
         <encoder>
