@@ -4,12 +4,9 @@ import akka.actor._
 
 import scala.concurrent.duration._
 
-import com.vpon.ssp.report.dedup.couchbase.CBExtension
 import com.vpon.ssp.report.dedup.actor.PartitionMasterProtocol.{PartitionStat, GetKafkaConnection, ReportKafkaConnection, ReportPartitionStat}
 import com.vpon.ssp.report.dedup.actor.ShepherdProtocol.AssignedPartitions
 import com.vpon.ssp.report.dedup.config.DedupConfig
-import com.vpon.ssp.report.dedup.flatten.Flattener
-import com.vpon.ssp.report.dedup.flatten.config.FlattenConfig
 
 
 class PartitionMaster() extends Actor with ActorLogging with DedupConfig {
@@ -17,41 +14,6 @@ class PartitionMaster() extends Actor with ActorLogging with DedupConfig {
     private var kafkaBrokers = ""
     private var kafkaTopic = ""
     private var isKafkaConnectOK = false
-    override def preStart: Unit = {
-        super.preStart
-        val dataBucket = CBExtension(system).buckets("data")
-        implicit val flattenConfig = FlattenConfig(
-            bannerDelayPeriod,
-            interstitialDelayPeriod,
-            dataBucket.bucket,
-            dataBucket.keyPrefix,
-            couchbaseMaxRetries,
-            couchbaseRetryInterval,
-            secretKeyMap,
-            concurrencyLevel,
-            placementInitialCapacity,
-            placementMaxSize,
-            placementExpire,
-            publisherInitialCapacity,
-            publisherMaxSize,
-            publisherExpire,
-            exchangeRateInitialCapacity,
-            exchangeRateMaxSize,
-            exchangeRateExpire,
-            publisherSspTaxRateInitialCapacity,
-            publisherSspTaxRateMaxSize,
-            publisherSspTaxRateExpire,
-            dspSspTaxRateInitialCapacity,
-            dspSspTaxRateMaxSize,
-            dspSspTaxRateExpire,
-            deviceInitialCapacity,
-            deviceMaxSize,
-            geographyInitialCapacity,
-            geographyMaxSize)
-
-        log.info("init caches and warm up mappings")
-        Flattener.init()
-    }
 
     def receive: akka.actor.Actor.Receive = {
 

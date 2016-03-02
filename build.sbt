@@ -5,7 +5,7 @@ import sbtassembly.AssemblyPlugin.autoImport._
 
 organization := "com.vpon"
 
-name := "ssp-etl"
+name := "ssp-kafka-s3"
 
 version := "0.1-SNAPSHOT"
 

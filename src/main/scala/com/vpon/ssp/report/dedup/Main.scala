@@ -27,8 +27,8 @@ object Main extends App {
                     httpPort: Int = DEFAULT_HTTP_PORT,
                     akkaPort: Option[Int] = None)
 
-  val parser = new scopt.OptionParser[ArgumentOptions]("ssp-dedup-main") {
-    head("ssp-dedup-main", "0.0.1")
+  val parser = new scopt.OptionParser[ArgumentOptions]("ssp-kafka-s3-main") {
+    head("ssp-kafka-s3-main", "0.0.1")
     opt[String]('c', "conf") required() action { case (v, c) =>
       c.copy(appConfPath = Some(v)) } text "specify application.conf path"
     opt[Int]('h', "httpPort") action { case (v, c) =>
@@ -68,7 +68,7 @@ object Main extends App {
 
   private def appStart(config: ArgumentOptions) {
 
-    implicit val system = ActorSystem("ssp-dedup")
+    implicit val system = ActorSystem("ssp-kafka-s3")
     implicit val dispatcher = system.dispatcher
 
     //connecting to couchbase which used for storing kafka offset by partitions
@@ -76,7 +76,7 @@ object Main extends App {
 
     // init cluster and discovery
     val cluster = Cluster(system)
-    val clusterGroup = system.settings.config.getString("ssp-dedup.cluster-group")
+    val clusterGroup = system.settings.config.getString("ssp-kafka-s3.cluster-group")
     val discoverer = system.actorOf(CouchbaseNodeDiscoverer.props(config.uuid, clusterGroup), name= "dedup-NodeDiscoverer")
 
     system.log.info("launched CouchbaseNodeDiscoverer")

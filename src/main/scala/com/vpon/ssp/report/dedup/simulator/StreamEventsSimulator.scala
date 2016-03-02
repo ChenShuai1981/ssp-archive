@@ -19,8 +19,8 @@ object StreamEventsSimulator extends App with GeneratorDrivenPropertyChecks {
                              topic: Option[String] = None,
                              debug: Option[String] = None)
 
-  val parser = new scopt.OptionParser[ArgumentOptions]("ssp-dedup-stream-event-simulator") {
-    head("ssp-dedup-stream-event-simulator", "0.0.1")
+  val parser = new scopt.OptionParser[ArgumentOptions]("ssp-kafka-s3-stream-event-simulator") {
+    head("ssp-kafka-s3-stream-event-simulator", "0.0.1")
     opt[String]('b', "brokers") action { case (v, c) =>
       c.copy(brokers = Some(v)) } text "Kafka brokers"
     opt[String]('t', "topic") action { case (v, c) =>

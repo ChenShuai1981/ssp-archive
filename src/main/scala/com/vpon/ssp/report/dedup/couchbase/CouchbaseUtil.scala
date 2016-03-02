@@ -2,48 +2,14 @@ package com.vpon.ssp.report.dedup.couchbase
 
 import scala.collection.JavaConversions._
 
+import com.couchbase.client.core.CouchbaseException
 import com.couchbase.client.java.Bucket
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
-import com.couchbase.client.java.error.DocumentAlreadyExistsException
 import com.couchbase.client.java.view._
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.LoggerFactory
 
-import com.vpon.ssp.report.dedup.flatten.exception.CouchbaseException
-
-
-case class ExchangeRateObjectKey(version: Int,
-                                 currency: String,
-                                 keyPrefix: String = "") {
-  def docKey: String = s"${keyPrefix}exchange_rate_${currency}_${version}"
-}
-
-case class PublisherSspTaxRateObjectKey(version: Int,
-                                        publisherCountryCode: String,
-                                        platformId: String,
-                                        keyPrefix: String = "") {
-  def docKey: String = s"${keyPrefix}publisher_ssp_tax_rate_${platformId}_${publisherCountryCode}_${version}"
-}
-
-case class DspSspTaxRateObjectKey(version: Int,
-                                  dspId: String,
-                                  platformId: String,
-                                  keyPrefix: String = "") {
-  def docKey: String = s"${keyPrefix}dsp_ssp_tax_rate_${platformId}_${dspId}_${version}"
-}
-
-case class PublisherObjectKey(publisherId: String,
-                              platformId: String,
-                              keyPrefix: String = "") {
-  def docKey: String = s"${keyPrefix}publishers_${platformId}_${publisherId}"
-}
-
-case class PlacementObjectKey(placementId: String,
-                              platformId: String,
-                              keyPrefix: String = "") {
-  def docKey: String = s"${keyPrefix}placements_${platformId}_${placementId}"
-}
 
 object CouchbaseUtil {
 

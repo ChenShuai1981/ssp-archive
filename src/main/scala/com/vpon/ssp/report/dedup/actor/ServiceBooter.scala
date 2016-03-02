@@ -29,12 +29,12 @@ class ServiceBooter() extends Actor with ActorLogging with DedupConfig {
   private def become(receive: Receive) = context.become(receive orElse unknown)
 
   private val unknown: Receive = {
-    case msg => log.info("ssp-dedup ServiceBooter got unknown message: {}", unknown)
+    case msg => log.info("ssp-kafka-s3 ServiceBooter got unknown message: {}", unknown)
   }
 
   private val stopped: Receive = {
     case Start(port) =>
-      log.info("ssp-dedup.start")
+      log.info("ssp-kafka-s3.start")
       become(starting)
       initActors(port)
   }
@@ -43,13 +43,13 @@ class ServiceBooter() extends Actor with ActorLogging with DedupConfig {
 
   private def starting: Receive = {
     case Http.Bound(address) =>
-      log.info("ssp-dedup.Bound. address: {}", address)
+      log.info("ssp-kafka-s3.Bound. address: {}", address)
       become(started(sender()))
   }
 
   private def started(listener: ActorRef): Receive = {
     case Stop =>
-      log.info("ssp-dedup.Stop")
+      log.info("ssp-kafka-s3.Stop")
       become(stopping)
       context.watch(listener)
       listener ! Http.Unbind
@@ -57,10 +57,10 @@ class ServiceBooter() extends Actor with ActorLogging with DedupConfig {
 
   private def stopping: Receive = {
     case Http.Unbound =>
-      log.info("ssp-dedup.Unbound")
+      log.info("ssp-kafka-s3.Unbound")
 
     case Terminated(_) =>
-      log.info("ssp-dedup.Terminated")
+      log.info("ssp-kafka-s3.Terminated")
       context.stop(self)
   }
 

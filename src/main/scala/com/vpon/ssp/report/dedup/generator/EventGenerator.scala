@@ -3,7 +3,7 @@ package com.vpon.ssp.report.dedup.generator
 
 import org.scalacheck.{Arbitrary, Gen}
 
-import com.vpon.ssp.report.flatten.cryption.crypto.DES
+import com.vpon.ssp.report.dedup.generator.crypto.DES
 import com.vpon.trade.Device.DeviceTime
 import com.vpon.trade.Event.EVENTTYPE
 import com.vpon.trade.Media.{ADPOSITIONTYPE, MEDIATYPE, SUPPLYTYPE}

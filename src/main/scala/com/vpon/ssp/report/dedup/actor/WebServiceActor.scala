@@ -15,8 +15,6 @@ import spray.json._
 
 import com.couchbase.client.java.document.StringDocument
 import com.google.common.cache.CacheStats
-import kafka.producer.KeyedMessage
-import org.apache.commons.lang3.exception.ExceptionUtils
 
 import WebServiceActor._
 import spray.can.Http
@@ -24,15 +22,7 @@ import spray.can.Http.Unbind
 import spray.http.HttpMethods._
 import spray.http.MediaTypes._
 import spray.http._
-import spray.httpx.unmarshalling._
-import spray.httpx.SprayJsonSupport._
 import com.vpon.ssp.report.dedup.couchbase.CBExtension
-import com.vpon.ssp.report.dedup.flatten.Flattener
-import com.vpon.ssp.report.dedup.flatten.exception.FlattenFailure
-import com.vpon.ssp.report.edge.Trade.TradeLogJsonProtocol
-import com.vpon.ssp.report.dedup.model.{EventRecordJsonProtocol, EventRecord}
-import TradeLogJsonProtocol._
-import EventRecordJsonProtocol._
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -46,9 +36,6 @@ import com.vpon.ssp.report.dedup.actor.PartitionActorProtocol.{ResumeWork, Pause
 import com.vpon.ssp.report.dedup.actor.PartitionMasterProtocol.{PartitionStat, GetKafkaConnection, ReportPartitionStat}
 import com.vpon.ssp.report.dedup.actor.PartitionMetricsProtocol.{GetInfo, GetMetrics}
 import com.vpon.ssp.report.dedup.config.DedupConfig
-import com.vpon.ssp.report.edge.Trade.{EdgeConvertFailure, EdgeEvent}
-import com.vpon.ssp.report.dedup.flatten._
-import com.vpon.ssp.report.dedup.flatten.exception.FlattenFailure
 
 
 object WebServiceActor {
@@ -132,8 +119,6 @@ class WebServiceActor extends Actor with ActorLogging with DedupConfig {
     case HttpRequest(GET, Uri.Path("/"), _, _, _) => index()
     case HttpRequest(GET, Uri.Path("/buildinfo"), _, _, _) => buildInfo()
     case HttpRequest(GET, Uri.Path("/healthchk"), _, _, _) => healthchk()
-    case HttpRequest(POST, uri@Uri.Path("/flatten"), headers, entity, _) => flatten(uri, headers, entity)
-    case HttpRequest(POST, uri@Uri.Path("/send"), headers, entity, _) => send(uri, headers, entity)
     case HttpRequest(GET, uri@Uri.Path("/jvm"), _, _, _) => {
       sender ! HttpResponse(entity = HttpEntity(`application/json`, jvmMBeansStatsPresentation.compactPrint))
     }
@@ -173,31 +158,13 @@ class WebServiceActor extends Actor with ActorLogging with DedupConfig {
     }
   }
 
-  private[this] def flatten(uri: Uri, headers: List[HttpHeader], entity: HttpEntity) = {
-    log.debug("flatten request entity (utf8): {}", entity.asString(HttpCharsets.`UTF-8`))
-    val client = sender()
-    flattenAndResponse(uri, headers, entity) map { httpResponse =>
-      log.debug("httpResponse: {}", httpResponse)
-      client ! httpResponse
-    }
-  }
-
-  private[this] def send(uri: Uri, headers: List[HttpHeader], entity: HttpEntity) = {
-    log.debug("send request entity (utf8): {}", entity.asString(HttpCharsets.`UTF-8`))
-    val client = sender()
-    sendAndResponse(uri, headers, entity) map { httpResponse =>
-      log.debug("httpResponse: {}", httpResponse)
-      client ! httpResponse
-    }
-  }
-
   private[this] def index() = {
     val html =
       """
         |<!DOCTYPE HTML>
         |<html>
         |<body>
-        |<h2>Welcome to SSP-DEDUP application console</h2>
+        |<h2>Welcome to ssp-kafka-s3 application console</h2>
         |<ol>
         |<li><a target="_blank" href="/buildinfo">Build Info</a></li>
         |<li><a target="_blank" href="/healthchk">Health Check</a></li>
@@ -210,8 +177,6 @@ class WebServiceActor extends Actor with ActorLogging with DedupConfig {
         |<li><a target="_blank" href="/partitionStat">Partition State</a></li>
         |<li><a target="_blank" href="/kafka">Kafka State</a></li>
         |<li><a target="_blank" href="/config">Show Config</a></li>
-        |<li><a target="_blank" href="/flatten">Convert Edge log into flattened record without sending to kafka</a> (use HTTP POST action)</li>
-        |<li><a target="_blank" href="/send">Send flattened record into kafka topic 2</a> (use HTTP POST action)</li>
         |<li><a target="_blank" href="/pauseAll">Pause all partition actors</a></li>
         |<li><a target="_blank" href="/resumeAll">Resume all partition actors without reset statistics</a></li>
         |<li><a target="_blank" href="/resetAll">Reset all partition actors and their statistics</a></li>
@@ -257,130 +222,6 @@ class WebServiceActor extends Actor with ActorLogging with DedupConfig {
       case "localhost" => code
       case "0:0:0:0:0:0:0:1" => code
       case _ => throw new UnsupportedOperationException("Disallow remote connection.")
-    }
-  }
-
-  private[this] def flattenAndResponse(uri:Uri, headers:List[HttpHeader], entity: HttpEntity): Future[HttpResponse] = {
-    case class FlattenException(status: StatusCode, msg: String) extends Exception(msg)
-    def parseRequest(entity: HttpEntity): com.vpon.trade.Event = {
-      val deserializeResult = entity.as[EdgeEvent]
-      deserializeResult match {
-        case Left(e: DeserializationError) => {
-          val err = "rest api /flatten triggered. json deserialization error when parsing request data into EdgeEvent!!!"
-          log.error(err)
-          throw new FlattenException(StatusCodes.BadRequest, err)
-        }
-        case Right(edgeEvent) => edgeEvent.toEvent match {
-          case Right(event) => event
-          case Left(f: EdgeConvertFailure) => {
-            val err = s"rest api /flatten triggered. bad json format: ${f.message} when convert Edge Event into Protobuf Event. "
-            log.error(err)
-            throw new FlattenException(StatusCodes.BadRequest, err)
-          }
-        }
-      }
-    }
-    def transformResponse(flattenResult: Either[FlattenFailure, EventRecord]): Future[HttpResponse] = {
-      lazy val defaultResponse = HttpResponse(StatusCodes.NoContent)
-      def result = flattenResult match {
-        case Right(eventRecord) => {
-          HttpResponse(status = StatusCodes.OK, entity = HttpEntity(`application/json`, eventRecord.toJson.compactPrint))
-        }
-        case Left(f: FlattenFailure) =>
-          HttpResponse(status = StatusCodes.OK, entity = HttpEntity(`text/plain`, f.message))
-      }
-      Future(result) recoverWith {
-        case e => Future.successful(defaultResponse)
-      }
-    }
-
-    val eventF: Future[com.vpon.trade.Event] = Future {
-      entity match {
-        case HttpEntity.NonEmpty(contentType, _) => contentType.mediaType match {
-          case MediaType("application/json") => parseRequest(entity)
-          case _ => {
-            val err = s"rest api /flatten triggered. contentType not supported yet"
-            log.error(err)
-            throw new FlattenException(StatusCodes.UnsupportedMediaType, err)
-          }
-        }
-        case _ => {
-          val err = s"rest api /flatten triggered. HttpEntity empty"
-          log.error(err)
-          throw new FlattenException(StatusCodes.BadRequest, err)
-        }
-      }
-    }
-
-    val f = for {
-      event <- eventF
-      flattenResult <- Flattener.getInstance.convert(event.toByteArray(), true)
-      response <- transformResponse(flattenResult)
-    } yield response
-
-    f.recover {
-      case e: FlattenException => HttpResponse(status = e.status, e.msg)
-      case e: Throwable => {
-        val err = s"rest api /flatten triggered. ${ExceptionUtils.getStackTrace(e)}"
-        log.error(err)
-        HttpResponse(status = StatusCodes.BadRequest, err)
-      }
-    }
-  }
-
-  private[this] def sendAndResponse(uri:Uri, headers:List[HttpHeader], entity: HttpEntity): Future[HttpResponse] = {
-    case class SendException(status: StatusCode, msg: String) extends Exception(msg)
-    def parseRequest(entity: HttpEntity): EventRecord = {
-      val deserializeResult = entity.as[EventRecord]
-      deserializeResult match {
-        case Left(e: DeserializationError) => {
-          val err = s"rest api /send triggered. json deserialization error when parsing request data into EventRecord"
-          log.error(err)
-          throw new SendException(StatusCodes.BadRequest, err)
-        }
-        case Right(eventRecord) => eventRecord
-      }
-    }
-
-    def transformResponse(eventRecord: EventRecord): HttpResponse = {
-      val targetKafkaProducer = new CustomPartitionProducer[String, String](flattenEventsBrokers, "kafka.serializer.StringEncoder", true)
-      val keyedMessage = new KeyedMessage(flattenEventsTopic, eventRecord.eventKey, eventRecord.toJson.compactPrint)
-      try {
-        targetKafkaProducer.sendMessages(Seq(keyedMessage))
-        HttpResponse(status = StatusCodes.OK, entity = HttpEntity(`text/plain`, "Success sent event record to kafka topic 2!"))
-      } catch {
-        case e: Throwable => {
-          val err = s"rest api /send triggered. failed to send event record to kafka topic 2!\n${ExceptionUtils.getStackTrace(e)}"
-          log.error(err)
-          throw new SendException(StatusCodes.InternalServerError, err)
-        }
-      }
-    }
-
-    Future {
-      val eventRecord = entity match {
-        case HttpEntity.NonEmpty(contentType, _) => contentType.mediaType match {
-          case MediaType("application/json") => parseRequest(entity)
-          case _ => {
-            val err = s"rest api /send triggered. contentType not supported yet"
-            log.error(err)
-            throw new SendException(StatusCodes.UnsupportedMediaType, err)
-          }
-        }
-        case _ => {
-          val err = s"rest api /send triggered. HttpEntity empty"
-          log.error(err)
-          throw new SendException(StatusCodes.BadRequest, err)
-        }
-      }
-      transformResponse(eventRecord)
-    }.recover{
-      case e: SendException => HttpResponse(status = e.status, e.msg)
-      case e: Throwable => {
-        val err = s"rest api /send triggered. ${ExceptionUtils.getStackTrace(e)}"
-        log.error(err)
-        HttpResponse(status = StatusCodes.BadRequest, err)
-      }
     }
   }
 

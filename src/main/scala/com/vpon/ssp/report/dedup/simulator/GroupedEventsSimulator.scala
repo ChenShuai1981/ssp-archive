@@ -18,8 +18,8 @@ object GroupedEventsSimulator extends App with GeneratorDrivenPropertyChecks {
   case class ArgumentOptions(brokers: Option[String] = None,
                              topic: Option[String] = None)
 
-  val parser = new scopt.OptionParser[ArgumentOptions]("ssp-dedup-grouped-event-simulator") {
-    head("ssp-dedup-grouped-event-simulator", "0.0.1")
+  val parser = new scopt.OptionParser[ArgumentOptions]("ssp-kafka-s3-grouped-event-simulator") {
+    head("ssp-kafka-s3-grouped-event-simulator", "0.0.1")
     opt[String]('b', "brokers") action { case (v, c) =>
       c.copy(brokers = Some(v)) } text "Kafka brokers"
     opt[String]('t', "topic") action { case (v, c) =>
