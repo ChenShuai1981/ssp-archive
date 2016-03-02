@@ -5,9 +5,11 @@ import java.io.ByteArrayInputStream
 import scala.concurrent.{Promise, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import com.amazonaws.auth.{AWSCredentialsProvider, DefaultAWSCredentialsProviderChain, AWSCredentials}
+import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentialsProvider, DefaultAWSCredentialsProviderChain, AWSCredentials}
 import com.amazonaws.event.{ProgressEventType, ProgressEvent, ProgressListener}
+import com.amazonaws.regions.RegionUtils
 import com.amazonaws.services.kinesis.model.ResourceNotFoundException
+import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{PutObjectRequest, ObjectMetadata}
 import com.amazonaws.services.s3.transfer.{Upload, TransferManager}
 import org.slf4j.LoggerFactory
@@ -31,8 +33,11 @@ class AwsService(awsConfig: AwsConfig) {
   val credentials: AWSCredentials = awsCredentialsProvider.getCredentials
 
   val regionName = awsConfig.regionName
+  val region = RegionUtils.getRegion(regionName)
 
   val tx: TransferManager = new TransferManager(credentials)
+  val s3: AmazonS3 = tx.getAmazonS3Client
+  s3.setRegion(region)
 
   val s3BucketName: String = awsConfig.s3BucketName
 
@@ -82,7 +87,7 @@ class AwsService(awsConfig: AwsConfig) {
   }
 
   private def validateBucket(bucketName: String) {
-    if (!tx.getAmazonS3Client.doesBucketExist(bucketName)) {
+    if (!s3.doesBucketExist(bucketName)) {
       throw new ResourceNotFoundException(s"bucket $bucketName does NOT exist")
     }
   }

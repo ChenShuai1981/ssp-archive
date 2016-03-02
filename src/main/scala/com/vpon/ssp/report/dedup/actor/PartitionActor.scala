@@ -85,9 +85,9 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
   @volatile
   private var sourceTopicsConsumer: Future[TopicsConsumer[String, Array[Byte], StringDecoder, DefaultDecoder, MessageAndMetadata[String, Array[Byte]]]] = _
 
-  private val awsService = new MockAwsService(
+  private val awsService = new AwsService(
     new AwsConfig(
-      regionName = "ap-northeast-1",
+      regionName = "cn-north-1",
       s3BucketName = "ssp-archive",
       dataPrefix = "data/",
       needCompress = false,
