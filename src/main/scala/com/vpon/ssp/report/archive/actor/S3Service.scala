@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory
 case class S3Config (
    regionName: String,
    bucketName: String,
-   dataPrefix: String,
    needCompress: Boolean,
    needEncrypt: Boolean
 )
@@ -26,8 +25,6 @@ case class S3Config (
 class S3Service(s3Config: S3Config) {
 
   val logger = LoggerFactory.getLogger("S3Service")
-
-  val dataPrefix: String = s3Config.dataPrefix
 
   val awsCredentialsProvider: AWSCredentialsProvider = new DefaultAWSCredentialsProviderChain()
   val credentials: AWSCredentials = awsCredentialsProvider.getCredentials

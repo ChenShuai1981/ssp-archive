@@ -8,9 +8,11 @@ object S3Util {
 
   val fmt: DateTimeFormatter = DateTimeFormat.forPattern(s3DateTimePattern).withZoneUTC()
 
-  def getS3Folder(eventTime: Long, prefix: String = ""): String = {
+  def getS3Folder(eventTime: Long, topic: String = ""): String = {
     val dateStr = fmt.print(eventTime)
-    prefix + dateStr
+    topic + "/" + dateStr
   }
+
+  def getS3FileName(messageKey: String): String = s"${messageKey}"
 
 }

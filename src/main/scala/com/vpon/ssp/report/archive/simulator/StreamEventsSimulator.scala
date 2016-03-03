@@ -68,7 +68,13 @@ object StreamEventsSimulator extends App with GeneratorDrivenPropertyChecks {
               forAll(genEvent) {
                 (event: Event) => {
                   id += 1
-                  val message = new KeyedMessage[String, Array[Byte]](edgeEventsTopic, event.`eventKey`, event.toByteArray)
+                  val eventTimestamp = event.`eventType` match {
+                    case Event.EVENTTYPE.TRADELOG => event.`tradeLog`.get.`bidTimestamp`
+                    case Event.EVENTTYPE.IMPRESSION => event.`impression`.get.`impressionTimestamp`
+                    case Event.EVENTTYPE.CLICK => event.`click`.get.`clickTimestamp`
+                    case _ => 0
+                  }
+                  val message = new KeyedMessage[String, Array[Byte]](edgeEventsTopic, eventTimestamp + "_" + event.`eventKey`, event.toByteArray)
                   messages += message
                 }
               }

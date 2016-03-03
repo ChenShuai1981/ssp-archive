@@ -89,7 +89,6 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
   private val s3Config = new S3Config(
     regionName = s3RegionName,
     bucketName = s3BucketName,
-    dataPrefix = s3DataPrefix,
     needCompress = s3NeedCompress,
     needEncrypt = s3NeedEncrypt
   )
@@ -270,7 +269,7 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
             0
           }
         }
-        val s3FileKey = S3Util.getS3Folder(eventTimestamp, s3Config.dataPrefix) + eventKey
+        val s3FileKey = S3Util.getS3Folder(eventTimestamp, sourceTopic) + S3Util.getS3FileName(eventKey)
         ArchiveS3File(s3FileKey, eventContent)
       })
     } else {
