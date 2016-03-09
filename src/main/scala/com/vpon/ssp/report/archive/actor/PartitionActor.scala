@@ -25,16 +25,6 @@ import com.vpon.ssp.report.archive.kafka.consumer.TopicsConsumer.AbsoluteOffset
 import com.vpon.ssp.report.archive.util.{S3Util, TimeUtil, Retry}
 import com.vpon.ssp.report.archive.util.Retry.NeedRetryException
 
-/**
-1. read msg from kafka
-2. Read the last sent message from kafka. check if the msg is sent before.
-3. Save the key of last message from kafka into couchbase if not found.
-4. Check couchbase if it has been processed before,
-5. If not, send to new kafka topic
-6. once ack received then write to couchbase the key of message is sent and offset
-Warning: Not consider case of processed messages with multiple batches but has no offset/dedup key in couchbase (maybe removed or lost)
-  */
-
 case class MessageFile(offset: Long, dateString: String, kv: (String, Array[Byte]))
 
 object PartitionActorProtocol {
@@ -209,15 +199,15 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
     } yield {
         sendResult match {
           case None => {
-            log.debug(s"${self.path} ==> [STEP 6.6] empty data set. But continue to process next batch messages without blocking")
+            log.debug(s"${self.path} ==> [STEP 2.3] empty data set. But continue to process next batch messages without blocking")
             doPostSendActions(mmds)
           }
           case Some(isSentSuccess) => {
             if (isSentSuccess) {
-              log.debug(s"${self.path} ==> [STEP 6.6] sent success. continue to doPostSendActions.")
+              log.debug(s"${self.path} ==> [STEP 2.3] sent success. continue to doPostSendActions.")
               doPostSendActions(mmds)
             } else {
-              val err = s"${self.path} ==> [STEP 6.6] sent failure"
+              val err = s"${self.path} ==> [STEP 2.3] sent failure"
               log.error(err)
               partitionMetrics ! Error(err)
               self ! PauseWork
@@ -248,14 +238,14 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
   }
 
   private def send(mmds: List[MessageAndMetadata[String, Array[Byte]]]): Future[Option[Boolean]] = {
-    log.debug(s"${self.path} ==> [STEP 6.1] start send")
+    log.debug(s"${self.path} ==> [STEP 2.1] start send")
     if (!mmds.isEmpty) {
       val allMessageFiles = mmds.map(convertMmdToMessageFile(_)) // default sort by offset
       val sendStartTime = System.currentTimeMillis()
       val s3Files = allMessageFiles.groupBy(_.dateString).map(kv => {
         val dateString = kv._1 // yyyy/MM/dd/HH/mm
         val batchMessageFiles = kv._2
-        // topicName.yyyy.MM.dd.HH.mm.partitionId.lastOffset+1.size
+        // topicName.yyyy.MM.dd.HH.mm.partitionId.(lastOffset+1).size
         val s3FileName = S3Util.getS3FileName(sourceTopic, dateString, partitionId, batchMessageFiles.last.offset, batchMessageFiles.size)
         val s3Folder = S3Util.getS3Folder(sourceTopic, dateString, partitionId)
         val s3Key = S3Util.getS3Key(s3Folder, s3FileName)
@@ -267,15 +257,15 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
       s3Service.send(s3Files, Some(partitionId)).map(k => {
         val sendTime = System.currentTimeMillis() - sendStartTime
         partitionMetrics ! Send(sendTime)
-        log.debug(s"${self.path} ==> [STEP 6.5] end send with true result.")
+        log.debug(s"${self.path} ==> [STEP 2.2] end send with true result.")
         k == 1 match {
           case true => Some(true)
           case false => Some(false)
         }
       })
     } else {
-      log.debug(s"${self.path} ==> [STEP 6.5] end send with None result.")
-      Future{None}
+      log.debug(s"${self.path} ==> [STEP 2.2] end send with None result.")
+      Future { None }
     }
   }
 
@@ -291,41 +281,41 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
         val time = System.currentTimeMillis()
         log.error(e, e.getMessage)
         partitionMetrics ! Error(e.getMessage)
-        log.error(s"${self.path} ==> Caught CouchbaseException when doPostSendActions at $time, so pause work!!.\n${ExceptionUtils.getStackTrace(e)}")
+        log.error(s"${self.path} ==> Caught CouchbaseException when doPostSendActions at $time, so pause work!!.", e)
         self ! PauseWork
       }
-      case e:Throwable => {
+      case t:Throwable => {
         val time = System.currentTimeMillis()
-        log.warning(s"${self.path} ==> Caught Throwable when doPostSendActions at $time, but still continue fetch next job.")
+        log.warning(s"${self.path} ==> Caught Throwable when doPostSendActions at $time, but still continue fetch next job.", t)
         self ! NextJob
       }
     }
   }
 
   private def updateLastOffset(mmds: List[MessageAndMetadata[String, Array[Byte]]]): Future[Option[Boolean]] = {
-    log.debug(s"${self.path} ==> [STEP 8.1] start updateLastOffset")
+    log.debug(s"${self.path} ==> [STEP 3.1] start updateLastOffset")
     if (!mmds.isEmpty) {
       val lastOffset = mmds.last.offset
       val toSaveOffset = lastOffset + 1
-      log.debug(s"${self.path} ==> [STEP 8.2] toSaveOffset: $toSaveOffset")
+      log.debug(s"${self.path} ==> [STEP 3.2] toSaveOffset: $toSaveOffset")
       retryCouchbaseOperation{
         offsetBucket.upsert(StringDocument.create(cbOffsetKey, toSaveOffset.toString))
       } map {
         strDoc => {
-          log.info(s"${self.path} ==> [STEP 8.3] Success to update last offset: $cbOffsetKey -> $toSaveOffset.")
+          log.info(s"${self.path} ==> [STEP 3.3] Success to update last offset: $cbOffsetKey -> $toSaveOffset.")
           partitionMetrics ! LastOffset(toSaveOffset)
-          log.debug(s"${self.path} ==> [STEP 8.4] end updateLastOffset with true result.")
+          log.debug(s"${self.path} ==> [STEP 3.4] end updateLastOffset with true result.")
           Some(true)
         }
       } recover {
         case e: Throwable => {
-          val err = s"${self.path} ==> [STEP 8.3] Failed to update last offset: $cbOffsetKey -> $toSaveOffset\n${ExceptionUtils.getStackTrace(e)}"
+          val err = s"${self.path} ==> [STEP 3.3] Failed to update last offset: $cbOffsetKey -> $toSaveOffset\n${ExceptionUtils.getStackTrace(e)}"
           throw new CouchbaseException(err)
         }
       }
     } else {
-      log.debug(s"${self.path} ==> [STEP 8.2] end updateLastOffset with None result.")
-      Future{None}
+      log.debug(s"${self.path} ==> [STEP 3.2] end updateLastOffset with None result.")
+      Future { None }
     }
   }
 
