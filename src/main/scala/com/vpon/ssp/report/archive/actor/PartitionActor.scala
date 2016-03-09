@@ -185,8 +185,7 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
         self ! Fulfill(Some(new CustomizedIterator[Array[Byte], DefaultDecoder](consumeBatchSize, s)))
       }
       case Failure(e) =>
-        log.debug(s"${self.path} ==> sourceTopicsConsumer failure. ${ExceptionUtils.getStackTrace(e)}")
-        val err = s"${self.path} ==> Failed to start PartitionActor for partition $partitionId, so pause work!!\n${ExceptionUtils.getStackTrace(e)}"
+        val err = s"${self.path} ==> sourceTopicsConsumer failure which results failed to start PartitionActor for partition $partitionId, so pause work!!\n${ExceptionUtils.getStackTrace(e)}"
         log.error(e, err)
         partitionMetrics ! Error(err)
         self ! PauseWork
@@ -221,7 +220,7 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
         val time = System.currentTimeMillis()
         log.error(e, e.getMessage)
         partitionMetrics ! Error(e.getMessage)
-        log.error(s"${self.path} ==> [STEP 6.6] Caught fatal exception ${e.getClass} when doWork at $time, so pause work!\n${ExceptionUtils.getStackTrace(e)}")
+        log.error(s"${self.path} ==> [STEP 3.5] Caught fatal exception ${e.getClass} when doWork at $time, so pause work!", e)
         self ! PauseWork
       }
     }

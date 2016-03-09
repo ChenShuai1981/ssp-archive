@@ -22,8 +22,9 @@ object CouchbaseUtil {
       bucket.upsert(doc)
     } catch {
       case e: Throwable => {
-        log.error(ExceptionUtils.getStackTrace(e))
-        throw new CouchbaseException("Couchbase error")
+        val err = s"Failed to upsert cb bucket data $doc"
+        log.error(err, e)
+        throw new CouchbaseException(err)
       }
     }
   }

@@ -6,7 +6,7 @@ object S3Util {
   val s3Delimiter = "/"
   val seperator = "."
   val period = "minutely"
-  val fileSuffix = ".arc"
+  val fileSuffix = "arc"
 
   // ssp-edge-events.2016.03.09.05.39.0.100.100.arc
   def getS3FileName(sourceTopic: String, dateString: String /* yyyy/MM/dd/HH/mm */, partitionId: Int, lastOffset: Long, batchSize: Int): String =
