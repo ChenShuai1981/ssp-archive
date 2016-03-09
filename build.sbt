@@ -34,8 +34,7 @@ libraryDependencies ++= Seq(
   "org.scalacheck"            %% "scalacheck"                 % "1.12.2",
   "org.scalatest"             %% "scalatest"                  % "2.2.4",
   "com.amazonaws"             %  "aws-java-sdk"               % "1.9.6",
-  "net.sandrogrzicic"         %% "scalabuff-runtime"          % "1.4.0",
-  "net.sandrogrzicic"         %% "scalabuff-compiler"         % "1.4.0"         % "compile",
+  "commons-lang"              %  "commons-lang"               % "2.6",
   "com.typesafe.akka"         %% "akka-slf4j"                 % "2.3.11"        % "test",
   "com.typesafe.akka"         %% "akka-testkit"               % "2.3.11"        % "test",
   "org.mockito"               %  "mockito-all"                % "1.9.5"         % "test",
@@ -47,44 +46,6 @@ resolvers ++= Seq(
   //"Vpon Test Artifactory" at "http://192.168.101.29:8081/artifactory/vpon-test",
   "typesafe.com" at "http://repo.typesafe.com/typesafe/maven-releases/"
 )
-
-val protobuf = taskKey[Unit]("Compile protobuf files.")
-
-def compileProtobuf(source: File,
-                            sourceManaged: File,
-                            classpath: Classpath,
-                            javaHome: Option[File],
-                            streams: TaskStreams,
-                            cache: File): Seq[File] = {
-  val input = source / "main" / "protobuf"
-  val args = Seq()
-  if (input.exists) {
-    val mainClass = "net.sandrogrzicic.scalabuff.compiler.ScalaBuff"
-    val output = source / "main" / "scala"
-    val outputs = Seq(output)
-    val cached = FileFunction.cached(cache / "scalabuff", FilesInfo.lastModified, FilesInfo.exists) {
-      (in: Set[File]) => {
-        println("compile protobuf files:", in.mkString(","))
-        outputs.map { output =>
-          IO.delete(output / "protobuf")
-          IO.createDirectory(output)
-          Fork.java(
-            javaHome,
-            List(
-              "-cp", classpath.map(_.data).mkString(File.pathSeparator), mainClass,
-              "--scala_out=" + output.toString,
-              "--generate_json_method"
-            ) ++ args.toSeq ++ in.toSeq.map(_.toString),
-            streams.log
-          )
-
-          (output ** ("*.scala")).get.toSet
-        }.head
-      }
-    }
-    cached((input ** "*.proto").get.toSet).toSeq
-  } else Nil
-}
 
 scalacOptions += "-deprecation"
 
@@ -103,10 +64,6 @@ test in assembly := {}
 ScoverageKeys.coverageExcludedPackages := "<empty>"
 ScoverageKeys.coverageMinimum := 80
 ScoverageKeys.coverageFailOnMinimum := false
-
-protobuf := {
-  compileProtobuf(sourceDirectory.value, sourceManaged.value, (managedClasspath in Compile).value, javaHome.value, streams.value, cacheDirectory.value)
-}
 
 assemblyMergeStrategy in assembly := {
   // Classes

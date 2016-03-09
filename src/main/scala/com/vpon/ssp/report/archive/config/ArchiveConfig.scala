@@ -56,7 +56,6 @@ trait ArchiveConfig {
    */
   lazy val s3RegionName = config.getString("s3.region-name")
   lazy val s3BucketName = config.getString("s3.bucket-name")
-  lazy val s3DataPrefix = config.getString("s3.data-prefix")
   lazy val s3NeedCompress = config.getBoolean("s3.need-compress")
   lazy val s3NeedEncrypt = config.getBoolean("s3.need-encrypt")
 

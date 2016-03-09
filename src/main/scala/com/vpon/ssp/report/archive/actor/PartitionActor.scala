@@ -14,17 +14,16 @@ import com.couchbase.client.java.document.StringDocument
 import kafka.common.TopicAndPartition
 import kafka.message.MessageAndMetadata
 import kafka.serializer.{StringDecoder, DefaultDecoder}
+import org.apache.commons.lang3.SerializationUtils
 import org.apache.commons.lang3.exception.ExceptionUtils
-import org.apache.kafka.common.KafkaException
 import com.vpon.ssp.report.archive.actor.PartitionActorProtocol._
 import com.vpon.ssp.report.archive.actor.PartitionMetricsProtocol._
 import com.vpon.ssp.report.archive.config.ArchiveConfig
 import com.vpon.ssp.report.archive.couchbase.CBExtension
 import com.vpon.ssp.report.archive.kafka.consumer.TopicsConsumer
 import com.vpon.ssp.report.archive.kafka.consumer.TopicsConsumer.AbsoluteOffset
-import com.vpon.ssp.report.archive.util.{S3Util, Retry}
+import com.vpon.ssp.report.archive.util.{S3Util, TimeUtil, Retry}
 import com.vpon.ssp.report.archive.util.Retry.NeedRetryException
-import com.vpon.trade.Event
 
 /**
 1. read msg from kafka
@@ -36,7 +35,7 @@ import com.vpon.trade.Event
 Warning: Not consider case of processed messages with multiple batches but has no offset/dedup key in couchbase (maybe removed or lost)
   */
 
-case class ArchiveS3File(key: String, content: Array[Byte])
+case class MessageFile(offset: Long, dateString: String, kv: (String, Array[Byte]))
 
 object PartitionActorProtocol {
   case class JobRequest(mmds: List[MessageAndMetadata[String, Array[Byte]]])
@@ -138,20 +137,6 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
       }
       case false => {
         log.debug(s"${self.path} ==> [STEP 1.2] received ${mmds.size} batch messages")
-        if (log.isDebugEnabled) {
-          for (mmd <- mmds) {
-            val key = mmd.key()
-            val message = mmd.message()
-            try {
-              val parsedEvent = Event.parseFrom(message)
-              log.debug(s"${self.path} ==> [STEP 1.3] received key: $key . Can parse message into Event: ${parsedEvent}.")
-            } catch {
-              case e: Exception =>
-                log.debug(s"${self.path} ==> [STEP 1.3] received key: $key . Can NOT parse message into Event.")
-            }
-          }
-        }
-        log.debug(s"${self.path} ==> [STEP 1.4] end handleJobRequest by doWork")
         doWork(mmds)
       }
     }
@@ -219,9 +204,8 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
   }
 
   def doWork(mmds: List[MessageAndMetadata[String, Array[Byte]]]): Future[Any] = {
-    val s3files = convert(mmds)
     val f = for {
-      sendResult <- send(s3files)
+      sendResult <- send(mmds)
     } yield {
         sendResult match {
           case None => {
@@ -233,8 +217,10 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
               log.debug(s"${self.path} ==> [STEP 6.6] sent success. continue to doPostSendActions.")
               doPostSendActions(mmds)
             } else {
-              log.warning(s"${self.path} ==> [STEP 6.6] sent failure?? But this branch should not be go through!!")
-              doPostSendActions(mmds)
+              val err = s"${self.path} ==> [STEP 6.6] sent failure"
+              log.error(err)
+              partitionMetrics ! Error(err)
+              self ! PauseWork
             }
           }
         }
@@ -251,41 +237,41 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
     }
   }
 
-  private def convert(mmds: List[MessageAndMetadata[String, Array[Byte]]]): List[ArchiveS3File] = {
-    if (!mmds.isEmpty) {
-      mmds.map(mmd => {
-        val eventKey = mmd.key()
-        val eventContent = mmd.message()
-        val eventOffset = mmd.offset
-        val event = Event.parseFrom(eventContent)
-        val eventTimestamp = event.`eventType` match {
-          case Event.EVENTTYPE.TRADELOG => event.`tradeLog`.get.`bidTimestamp`
-          case Event.EVENTTYPE.IMPRESSION => event.`impression`.get.`impressionTimestamp`
-          case Event.EVENTTYPE.CLICK => event.`click`.get.`clickTimestamp`
-          case _ => {
-            val err = s"Unknown EVENTTYPE: ${event.`eventType`}. eventKey: $eventKey. event: ${event.toJson()}"
-            log.warning(err)
-            partitionMetrics ! UnknownEventType(eventOffset, eventKey)
-            0
-          }
-        }
-        val s3FileKey = S3Util.getS3Folder(eventTimestamp, sourceTopic) + S3Util.getS3FileName(eventKey)
-        ArchiveS3File(s3FileKey, eventContent)
-      })
-    } else {
-      List.empty[ArchiveS3File]
-    }
+  private def convertMmdToMessageFile(mmd: MessageAndMetadata[String, Array[Byte]]): MessageFile = {
+      val eventKey = mmd.key()
+      val eventOffset = mmd.offset
+      val eventTimestamp = eventKey.split("_").head.toLong
+      val dateString = TimeUtil.convertToS3TimestampString(eventTimestamp)
+      //log.debug(s"${self.path} ==> eventTimestamp = $eventTimestamp, dateString = $dateString")
+      val kv = (eventKey, mmd.message())
+      MessageFile(eventOffset, dateString, kv)
   }
 
-  private def send(archiveS3Files: List[ArchiveS3File]): Future[Option[Boolean]] = {
+  private def send(mmds: List[MessageAndMetadata[String, Array[Byte]]]): Future[Option[Boolean]] = {
     log.debug(s"${self.path} ==> [STEP 6.1] start send")
-    if (!archiveS3Files.isEmpty) {
+    if (!mmds.isEmpty) {
+      val allMessageFiles = mmds.map(convertMmdToMessageFile(_)) // default sort by offset
       val sendStartTime = System.currentTimeMillis()
-      s3Service.send(archiveS3Files, Some(partitionId)).map(k => {
+      val s3Files = allMessageFiles.groupBy(_.dateString).map(kv => {
+        val dateString = kv._1 // yyyy/MM/dd/HH/mm
+        val batchMessageFiles = kv._2
+        // topicName.yyyy.MM.dd.HH.mm.partitionId.lastOffset+1.size
+        val s3FileName = S3Util.getS3FileName(sourceTopic, dateString, partitionId, batchMessageFiles.last.offset, batchMessageFiles.size)
+        val s3Folder = S3Util.getS3Folder(sourceTopic, dateString, partitionId)
+        val s3Key = S3Util.getS3Key(s3Folder, s3FileName)
+        val batchArrayBytes: Array[(String, Array[Byte])] = batchMessageFiles.map(file => file.kv).toArray
+        val s3Content: Array[Byte] = SerializationUtils.serialize(batchArrayBytes)
+        S3File(s3Key, s3Content)
+      })
+
+      s3Service.send(s3Files, Some(partitionId)).map(k => {
         val sendTime = System.currentTimeMillis() - sendStartTime
         partitionMetrics ! Send(sendTime)
         log.debug(s"${self.path} ==> [STEP 6.5] end send with true result.")
-        Some(true)
+        k == 1 match {
+          case true => Some(true)
+          case false => Some(false)
+        }
       })
     } else {
       log.debug(s"${self.path} ==> [STEP 6.5] end send with None result.")

@@ -1,18 +1,18 @@
 package com.vpon.ssp.report.archive.util
 
-import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 
 object S3Util {
 
-  val s3DateTimePattern = "yyyy/MM/dd/HH/mm/"
+  val s3Delimiter = "/"
+  val seperator = "."
+  val period = "minutely"
 
-  val fmt: DateTimeFormatter = DateTimeFormat.forPattern(s3DateTimePattern).withZoneUTC()
+  def getS3FileName(sourceTopic: String, dateString: String /* yyyy/MM/dd/HH/mm */, partitionId: Int, lastOffset: Long, batchSize: Int): String =
+    sourceTopic + seperator + dateString.replaceAll(s3Delimiter, seperator) + seperator + partitionId + seperator + (lastOffset+1) + seperator + batchSize
 
-  def getS3Folder(eventTime: Long, topic: String = ""): String = {
-    val dateStr = fmt.print(eventTime)
-    topic + "/" + dateStr
-  }
+  def getS3Folder(sourceTopic: String, dateString: String /* yyyy/MM/dd/HH/mm */, partitionId: Int): String =
+    "topics" + s3Delimiter + sourceTopic + s3Delimiter + period + s3Delimiter + dateString + s3Delimiter + partitionId
 
-  def getS3FileName(messageKey: String): String = s"${messageKey}"
+  def getS3Key(s3Folder: String, s3FileName: String): String = s3Folder + s3Delimiter + s3FileName
 
 }

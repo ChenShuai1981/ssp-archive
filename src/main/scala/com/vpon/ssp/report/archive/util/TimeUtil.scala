@@ -6,10 +6,9 @@ import org.joda.time.format.DateTimeFormatter
 
 object TimeUtil {
 
-  val redshiftDateTimePattern = "yyyy-MM-dd hh:mm:ss"
-  val fmt: DateTimeFormatter = DateTimeFormat.forPattern(redshiftDateTimePattern).withZoneUTC()
+  val s3DateTimePattern = "yyyy/MM/dd/HH/mm"
 
-  def convertTimestampToString(timestamp: Long): String = {
-    fmt.print(timestamp)
-  }
+  val s3Fmt: DateTimeFormatter = DateTimeFormat.forPattern(s3DateTimePattern).withZoneUTC()
+
+  def convertToS3TimestampString(eventTime: Long) = s3Fmt.print(eventTime)
 }

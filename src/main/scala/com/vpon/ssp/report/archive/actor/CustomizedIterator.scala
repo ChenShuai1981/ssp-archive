@@ -11,12 +11,19 @@ class CustomizedIterator[V, D <: kafka.serializer.Decoder[_]](batchSize: Int, tc
   override def next() : Seq[MessageAndMetadata[String, V]] = {
     var batch = new scala.collection.mutable.ListBuffer[MessageAndMetadata[String, V]]()
     while({
-      val nextMessage = tc.getNextIfAvailable()
-      nextMessage match {
-        case Some(n) => batch.+=(n)
-        case None =>
-      }
-      nextMessage.isDefined && batch.size < batchSize
+      /**
+       * block to poll messages until fit batch size to emit
+       * in order to match requirement of repeatable write S3
+       */
+//      val nextMessage = tc.getNextIfAvailable()
+//      nextMessage match {
+//        case Some(n) => batch.+=(n)
+//        case None =>
+//      }
+//      nextMessage.isDefined && batch.size < batchSize
+
+      batch.+=(tc.getNext())
+      batch.size < batchSize
     }) {
     }
     batch

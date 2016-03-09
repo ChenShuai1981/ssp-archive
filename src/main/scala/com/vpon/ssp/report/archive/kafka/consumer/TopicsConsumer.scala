@@ -82,7 +82,7 @@ R: ClassTag] (
 
   var ci = -1
 
-  override protected def getNext(): R = {
+  override def getNext(): R = {
     var result = buffer.poll()
     var retry = 0
     while(result == null && !finished) {

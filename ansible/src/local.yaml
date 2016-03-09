@@ -10,10 +10,9 @@ application.conf:
     CB_BUCKET_ARCHIVE_OFFSET_KEY_PREFIX: 'ao_'
     KAFKA_BROKERS_ARCHIVE_CONSUMER: 'localhost:9092'
     KAFKA_TOPIC_ARCHIVE_CONSUMER: 'ssp-edge-events'
-    BATCH_SIZE: '10'
+    BATCH_SIZE: '300'
     S3_REGION_NAME: '"cn-north-1"'
     S3_BUCKET_NAME: '"ssp-local-archive"'
-    S3_DATA_PREFIX: '"data/"'
     S3_NEED_COMPRESS: 'false'
     S3_NEED_ENCRYPT: 'false'
 
