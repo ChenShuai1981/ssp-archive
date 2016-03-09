@@ -243,7 +243,7 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
       val sendStartTime = System.currentTimeMillis()
       val s3Files = allMessageFiles.groupBy(_.dateString).map(kv => {
         val dateString = kv._1 // yyyy/MM/dd/HH/mm
-        val batchMessageFiles = kv._2
+        val batchMessageFiles = kv._2.sortBy(_.offset)
         // topicName.yyyy.MM.dd.HH.mm.partitionId.(lastOffset+1).size
         val s3FileName = S3Util.getS3FileName(sourceTopic, dateString, partitionId, batchMessageFiles.last.offset, batchMessageFiles.size)
         val s3Folder = S3Util.getS3Folder(sourceTopic, dateString, partitionId)
