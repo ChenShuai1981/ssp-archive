@@ -6,7 +6,7 @@ import scala.language.postfixOps
 import scala.concurrent.duration._
 import scala.collection.JavaConversions._
 
-import spray.json.{JsNumber, JsString, JsObject, JsValue}
+import spray.json._
 import com.couchbase.client.java.CouchbaseCluster
 import com.typesafe.config.ConfigFactory
 
@@ -52,12 +52,12 @@ trait ArchiveConfig {
   }
 
   /**
-   * S3
+   * AWS S3
    */
-  lazy val s3RegionName = config.getString("s3.region-name")
-  lazy val s3BucketName = config.getString("s3.bucket-name")
-  lazy val s3NeedCompress = config.getBoolean("s3.need-compress")
-  lazy val s3NeedEncrypt = config.getBoolean("s3.need-encrypt")
+  lazy val s3RegionName = config.getString("aws.region-name")
+  lazy val s3BucketName = config.getString("aws.s3.bucket-name")
+  lazy val s3CompressionType = config.getString("aws.s3.compression-type")
+  lazy val s3NeedEncrypt = config.getBoolean("aws.s3.need-encrypt")
 
 
   def config2Json(): JsValue = {
@@ -89,6 +89,14 @@ trait ArchiveConfig {
         "consumer" -> JsObject(
           "topic" -> JsString(sourceTopic),
           "brokers" -> JsString(sourceBrokers)
+        )
+      ),
+      "aws" -> JsObject(
+        "region-name" -> JsString(s3RegionName),
+        "s3" -> JsObject(
+          "bucket-name" -> JsString(s3BucketName),
+          "compression-type" -> JsString(s3CompressionType),
+          "need-encrypt" -> JsBoolean(s3NeedEncrypt)
         )
       )
     )

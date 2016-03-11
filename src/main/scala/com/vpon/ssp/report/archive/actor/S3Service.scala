@@ -24,7 +24,7 @@ case class S3Config (
    needEncrypt: Boolean
 )
 
-case class S3File(key: String, content: Array[Byte])
+case class S3File(key: String, content: Array[Byte], fileName: String)
 
 class S3Service(s3Config: S3Config) {
 
@@ -86,6 +86,7 @@ class S3Service(s3Config: S3Config) {
     val s3Key = s3File.key
     logger.debug(s"s3Key ==> $s3Key, bufSize ==> ${buf.size}")
     val metadata = new ObjectMetadata
+    metadata.setContentLength(buf.size)
     val putObjectRequest = new PutObjectRequest(s3BucketName, s3Key, s3Object, metadata)
     // Fix com.amazonaws.ResetException: Content length exceeded the reset buffer limit of 131073;
     // If the request involves an input stream, the maximum stream buffer size can be configured via request.getRequestClientOptions().setReadLimit(int)

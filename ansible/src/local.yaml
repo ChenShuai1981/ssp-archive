@@ -11,10 +11,10 @@ application.conf:
     KAFKA_BROKERS_ARCHIVE_CONSUMER: 'localhost:9092'
     KAFKA_TOPIC_ARCHIVE_CONSUMER: 'ssp-edge-events'
     BATCH_SIZE: '300'
-    S3_REGION_NAME: '"cn-north-1"'
-    S3_BUCKET_NAME: '"ssp-archive"'
-    S3_NEED_COMPRESS: 'false'
-    S3_NEED_ENCRYPT: 'false'
+    AWS_REGION_NAME: 'cn-north-1'
+    AWS_S3_BUCKET_NAME: 'ssp-archive'
+    AWS_S3_COMPRESSION_TYPE: 'GZIP'
+    AWS_S3_NEED_ENCRYPT: 'false'
 
 logback.xml:
     INSIDE_LOG_DIR: '/Users/chenshuai/logs'

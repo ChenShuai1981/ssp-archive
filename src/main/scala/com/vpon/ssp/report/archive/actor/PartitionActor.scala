@@ -24,6 +24,8 @@ import com.vpon.ssp.report.archive.kafka.consumer.TopicsConsumer
 import com.vpon.ssp.report.archive.kafka.consumer.TopicsConsumer.AbsoluteOffset
 import com.vpon.ssp.report.archive.util.{S3Util, TimeUtil, Retry}
 import com.vpon.ssp.report.archive.util.Retry.NeedRetryException
+import com.vpon.ssp.report.dedup.actor.BZIP2Compressor
+import com.vpon.ssp.report.dedup.actor.GZIPCompressor
 
 case class MessageFile(offset: Long, dateString: String, kv: (String, Array[Byte]))
 
@@ -78,7 +80,7 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
   private val s3Config = new S3Config(
     regionName = s3RegionName,
     bucketName = s3BucketName,
-    needCompress = s3NeedCompress,
+    needCompress = s3CompressionType,
     needEncrypt = s3NeedEncrypt
   )
 
@@ -244,13 +246,15 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
       val s3Files = allMessageFiles.groupBy(_.dateString).map(kv => {
         val dateString = kv._1 // yyyy/MM/dd/HH/mm
         val batchMessageFiles = kv._2.sortBy(_.offset)
+        val batchArrayBytes: Array[(String, Array[Byte])] = batchMessageFiles.map(file => file.kv).toArray
+        val beforeCompressionData = SerializationUtils.serialize(batchArrayBytes)
+        val (s3Content, fileSuffix) = compressOrNot(beforeCompressionData, s3CompressionType)
+
         // topicName.yyyy.MM.dd.HH.mm.partitionId.(lastOffset+1).size
-        val s3FileName = S3Util.getS3FileName(sourceTopic, dateString, partitionId, batchMessageFiles.last.offset, batchMessageFiles.size)
+        val s3FileName = S3Util.getS3FileName(sourceTopic, dateString, partitionId, batchMessageFiles.last.offset, batchMessageFiles.size, fileSuffix)
         val s3Folder = S3Util.getS3Folder(sourceTopic, dateString, partitionId)
         val s3Key = S3Util.getS3Key(s3Folder, s3FileName)
-        val batchArrayBytes: Array[(String, Array[Byte])] = batchMessageFiles.map(file => file.kv).toArray
-        val s3Content: Array[Byte] = SerializationUtils.serialize(batchArrayBytes)
-        S3File(s3Key, s3Content)
+        S3File(s3Key, s3Content, s3FileName)
       })
 
       s3Service.send(s3Files, Some(partitionId)).map(k => {
@@ -265,6 +269,22 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
     } else {
       log.debug(s"${self.path} ==> [STEP 2.2] end send with None result.")
       Future { None }
+    }
+  }
+
+  private def compressOrNot(inputData: Array[Byte], compressionType: String): (Array[Byte], String) = {
+    log.debug(s"${self.path} ==> [STEP 5.3] compressOrNot. compressionType: $compressionType ")
+    compressionType match {
+      case "GZIP" => {
+        (GZIPCompressor.compressData(inputData), "gz")
+      }
+      case "BZIP2" => {
+        (BZIP2Compressor.compressData(inputData), "bz2")
+      }
+      case "LZOP" => {
+        (LZOPCompressor.compressData(inputData), "lzo")
+      }
+      case _ => (inputData, "csv")
     }
   }
 
