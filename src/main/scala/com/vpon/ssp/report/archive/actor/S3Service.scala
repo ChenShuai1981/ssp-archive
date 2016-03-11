@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory
 case class S3Config (
    regionName: String,
    bucketName: String,
-   needCompress: Boolean,
    needEncrypt: Boolean
 )
 
@@ -44,8 +43,6 @@ class S3Service(s3Config: S3Config) {
 
   validateBucket(s3BucketName)
 
-  // TODO
-  val needCompress: Boolean = s3Config.needCompress
   val needEncrypt: Boolean = s3Config.needEncrypt
 
   class S3UploadListener(p: Promise[Boolean], upload: Upload) extends ProgressListener {
@@ -87,6 +84,9 @@ class S3Service(s3Config: S3Config) {
     logger.debug(s"s3Key ==> $s3Key, bufSize ==> ${buf.size}")
     val metadata = new ObjectMetadata
     metadata.setContentLength(buf.size)
+    if (needEncrypt) {
+      metadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION)
+    }
     val putObjectRequest = new PutObjectRequest(s3BucketName, s3Key, s3Object, metadata)
     // Fix com.amazonaws.ResetException: Content length exceeded the reset buffer limit of 131073;
     // If the request involves an input stream, the maximum stream buffer size can be configured via request.getRequestClientOptions().setReadLimit(int)

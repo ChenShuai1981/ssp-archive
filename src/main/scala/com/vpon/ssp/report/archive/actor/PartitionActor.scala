@@ -24,8 +24,6 @@ import com.vpon.ssp.report.archive.kafka.consumer.TopicsConsumer
 import com.vpon.ssp.report.archive.kafka.consumer.TopicsConsumer.AbsoluteOffset
 import com.vpon.ssp.report.archive.util.{S3Util, TimeUtil, Retry}
 import com.vpon.ssp.report.archive.util.Retry.NeedRetryException
-import com.vpon.ssp.report.dedup.actor.BZIP2Compressor
-import com.vpon.ssp.report.dedup.actor.GZIPCompressor
 
 case class MessageFile(offset: Long, dateString: String, kv: (String, Array[Byte]))
 
@@ -80,7 +78,6 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
   private val s3Config = new S3Config(
     regionName = s3RegionName,
     bucketName = s3BucketName,
-    needCompress = s3CompressionType,
     needEncrypt = s3NeedEncrypt
   )
 
