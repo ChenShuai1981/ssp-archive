@@ -247,8 +247,8 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
         val beforeCompressionData = SerializationUtils.serialize(batchArrayBytes)
         val (s3Content, fileSuffix) = compressOrNot(beforeCompressionData, s3CompressionType)
 
-        // topicName.yyyy.MM.dd.HH.mm.partitionId.(lastOffset+1).size
-        val s3FileName = S3Util.getS3FileName(sourceTopic, dateString, partitionId, batchMessageFiles.last.offset, batchMessageFiles.size, fileSuffix)
+        // topicName.yyyy.MM.dd.HH.mm.partitionId.headOffset.lastOffset.size.ar.[data | gz | bz2]
+        val s3FileName = S3Util.getS3FileName(sourceTopic, dateString, partitionId, batchMessageFiles.head.offset, batchMessageFiles.last.offset, batchMessageFiles.size, fileSuffix)
         val s3Folder = S3Util.getS3Folder(sourceTopic, dateString, partitionId)
         val s3Key = S3Util.getS3Key(s3Folder, s3FileName)
         S3File(s3Key, s3Content, s3FileName)
@@ -281,7 +281,7 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
       case "LZOP" => {
         (LZOPCompressor.compressData(inputData), "lzo")
       }
-      case _ => (inputData, "csv")
+      case _ => (inputData, "data")
     }
   }
 
