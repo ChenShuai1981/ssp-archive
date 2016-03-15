@@ -15,4 +15,4 @@ cd ..
 echo "launching application ......"
 #sbt -Dlogback.configurationFile=./ansible/target/${ENV}/logback.xml "runMain com.vpon.ssp.report.dedup.Main -c ./ansible/target/${ENV}/application.conf"
 
-sbt -DPORT=${AKKA_PORT} -Dlogback.configurationFile=./ansible/target/dev/logback.xml "runMain com.vpon.ssp.report.dedup.Main -c ./ansible/target/dev/application.conf -h ${HTTP_PORT}"
+sbt -DPORT=${AKKA_PORT} -Dlogback.configurationFile=./ansible/target/dev/logback.xml "runMain com.vpon.ssp.report.archive.Main -c ./ansible/target/dev/application.conf -h ${HTTP_PORT}"

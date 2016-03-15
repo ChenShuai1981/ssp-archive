@@ -278,9 +278,6 @@ class PartitionActor(val partitionId: Int, val master:ActorRef) extends Actor wi
       case "BZIP2" => {
         (BZIP2Compressor.compressData(inputData), "bz2")
       }
-      case "LZOP" => {
-        (LZOPCompressor.compressData(inputData), "lzo")
-      }
       case _ => (inputData, "data")
     }
   }
